@@ -19,24 +19,24 @@ A pre-action safety guard skill for AI coding agents. It intercepts and evaluate
 
 ### Notification
 
-The skill uses the notification channel configured by the user in `.kiro/settings/safety-notify.json`. Supports Slack, DingTalk, Feishu, WeCom, and custom webhooks. Falls back to system notification or IDE prompt if not configured.
+The skill uses the notification channel configured by the user in `.ai-safety/config.json`. Supports Slack, DingTalk, Feishu, WeCom, and custom webhooks. Falls back to system notification or IDE prompt if not configured.
 
 ### Installation
 
-Copy the skill folder into your skills directory:
+Copy the skill folder to your AI agent's configuration directory. The exact path depends on your agent platform:
 
 ```bash
-# Global (all workspaces)
-cp -r pre-action-safety-skill ~/.kiro/skills/
+# Example: project-level
+cp -r pre-action-safety-skill .ai-safety/skills/
 
-# Workspace-level
-cp -r pre-action-safety-skill .kiro/skills/
+# Example: user-level
+cp -r pre-action-safety-skill ~/.ai-safety/skills/
 ```
 
 For the Chinese version:
 
 ```bash
-cp -r pre-action-safety-skill-zh ~/.kiro/skills/
+cp -r pre-action-safety-skill-zh .ai-safety/skills/
 ```
 
 ### Structure
@@ -66,18 +66,18 @@ pre-action-safety-skill-zh/
 
 ### 通知方式
 
-技能会使用用户在 `.kiro/settings/safety-notify.json` 中配置的通知渠道，支持 Slack、钉钉、飞书、企业微信和自定义 webhook。未配置时回退到系统通知或 IDE 内提示。
+技能会使用用户在 `.ai-safety/config.json` 中配置的通知渠道，支持 Slack、钉钉、飞书、企业微信和自定义 webhook。未配置时回退到系统通知或 IDE 内提示。
 
 ### 安装
 
-将技能文件夹复制到 skills 目录：
+将技能文件夹复制到你的 AI agent 配置目录。具体路径取决于你使用的 agent 平台：
 
 ```bash
-# 全局（所有工作区）
-cp -r pre-action-safety-skill-zh ~/.kiro/skills/
+# 示例：项目级别
+cp -r pre-action-safety-skill-zh .ai-safety/skills/
 
-# 工作区级别
-cp -r pre-action-safety-skill-zh .kiro/skills/
+# 示例：用户级别
+cp -r pre-action-safety-skill-zh ~/.ai-safety/skills/
 ```
 
 ### 许可证

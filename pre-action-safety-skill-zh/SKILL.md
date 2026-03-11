@@ -162,7 +162,7 @@ metadata:
 
 按以下优先级选择通知渠道：
 
-1. **用户配置的 Webhook**（最高优先级）：如果用户在 `.kiro/settings/safety-notify.json` 中配置了 webhook，**必须优先通过该 webhook 发送通知到用户指定的 IM 渠道**
+1. **用户配置的 Webhook**（最高优先级）：如果用户在 `.ai-safety/config.json` 中配置了 webhook，**必须优先通过该 webhook 发送通知到用户指定的 IM 渠道**
 2. **系统通知**：如果用户启用了 `enableSystemNotification`，通过 macOS Notification Center 推送
 3. **IDE 内提示**（兜底）：以上均未配置时，回退到当前 IDE/聊天窗口内直接提示
 
@@ -170,7 +170,7 @@ metadata:
 
 ### Webhook 配置
 
-用户可在项目根目录创建 `.kiro/settings/safety-notify.json` 配置通知渠道。Agent 在每次需要通知时，**必须先读取此文件**以确定通知方式：
+用户可在项目根目录创建 `.ai-safety/config.json` 配置通知渠道。Agent 在每次需要通知时，**必须先读取此文件**以确定通知方式：
 
 ```json
 {
@@ -186,6 +186,138 @@ metadata:
 支持的 type：`slack`、`dingtalk`（钉钉）、`feishu`（飞书）、`wecom`（企业微信）、`custom`（自定义）
 
 如果配置文件不存在或 webhook 字段为空，则跳过 webhook 通知，使用下一优先级的通知方式。
+
+---
+
+## 审计日志
+
+所有风险评估结果必须持久化记录，便于事后回溯和安全审计。
+
+### 日志存储位置
+
+按以下优先级确定日志文件位置：
+
+1. **用户配置路径**：如果 `.ai-safety/config.json` 中配置了 `auditLog.path`，使用该路径
+2. **项目级默认**：`.ai-safety/logs/safety-audit.log`
+3. **用户级默认**：`~/.ai-safety/logs/safety-audit.log`
+
+### 日志格式
+
+采用 JSON Lines 格式（每行一条独立 JSON），便于解析和检索：
+
+```json
+{
+  "timestamp": "2026-03-11T14:32:05.123Z",
+  "level": "CRITICAL",
+  "action": "rm -rf ~/.ssh/",
+  "category": "credential_deletion",
+  "result": "blocked",
+  "reason": "尝试删除 SSH 凭证目录",
+  "context": {
+    "workingDir": "/Users/dev/my-project",
+    "triggeredBy": "user_prompt",
+    "sessionId": "abc123"
+  },
+  "notification": {
+    "channel": "slack",
+    "sent": true,
+    "webhookStatus": 200
+  }
+}
+```
+
+### 字段说明
+
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `timestamp` | string | ISO 8601 格式的 UTC 时间戳 |
+| `level` | string | 风险等级：`CRITICAL`、`HIGH`、`MEDIUM`、`LOW` |
+| `action` | string | 被评估的动作/命令 |
+| `category` | string | 风险分类（见下方分类表） |
+| `result` | string | 处理结果：`blocked`、`paused`、`confirmed`、`cancelled`、`notified`、`allowed` |
+| `reason` | string | 风险原因说明 |
+| `context.workingDir` | string | 当前工作目录 |
+| `context.triggeredBy` | string | 触发来源：`user_prompt`、`agent_action`、`script` |
+| `context.sessionId` | string | 会话标识符，用于关联同一会话的多条日志 |
+| `notification.channel` | string | 通知渠道：`slack`、`dingtalk`、`feishu`、`wecom`、`system`、`ide`、`none` |
+| `notification.sent` | boolean | 通知是否成功发送 |
+| `notification.webhookStatus` | number | Webhook 响应状态码（如适用） |
+
+### 风险分类（category）
+
+| 分类 | 说明 |
+| --- | --- |
+| `credential_deletion` | 删除凭证文件 |
+| `credential_access` | 访问/读取凭证文件 |
+| `credential_exfiltration` | 向外部发送凭证 |
+| `destructive_command` | 破坏性删除命令 |
+| `system_config_modification` | 修改系统级配置 |
+| `shell_config_modification` | 修改 shell 配置 |
+| `privilege_escalation` | 权限提升 |
+| `network_exposure` | 网络端口暴露 |
+| `remote_connection` | 远程连接/反向 shell |
+| `untrusted_execution` | 执行不受信任的脚本/包 |
+| `persistence_mechanism` | 添加持久化机制（crontab、启动项） |
+| `path_traversal` | 路径穿越访问 |
+| `pipe_install` | 管道安装命令 |
+| `docker_operation` | Docker 相关操作 |
+| `project_modification` | 项目文件修改 |
+| `unknown` | 未识别的命令 |
+
+### 日志配置
+
+在 `.ai-safety/config.json` 中添加 `auditLog` 配置：
+
+```json
+{
+  "notify": {
+    "webhook": "https://hooks.slack.com/services/xxx/yyy/zzz",
+    "type": "slack"
+  },
+  "auditLog": {
+    "enabled": true,
+    "path": ".ai-safety/logs/safety-audit.log",
+    "maxSizeMB": 50,
+    "rotateCount": 5,
+    "minLevel": "MEDIUM"
+  }
+}
+```
+
+| 配置项 | 默认值 | 说明 |
+| --- | --- | --- |
+| `enabled` | `true` | 是否启用审计日志 |
+| `path` | `.ai-safety/logs/safety-audit.log` | 日志文件路径 |
+| `maxSizeMB` | `50` | 单个日志文件最大大小（MB） |
+| `rotateCount` | `5` | 保留的历史日志文件数量 |
+| `minLevel` | `LOW` | 最低记录等级（`LOW` 记录所有，`MEDIUM` 只记录 MEDIUM 及以上） |
+
+### 日志轮转
+
+当日志文件达到 `maxSizeMB` 时，自动轮转：
+
+```text
+safety-audit.log      → safety-audit.1.log
+safety-audit.1.log    → safety-audit.2.log
+...
+safety-audit.4.log    → 删除
+```
+
+### 日志查询示例
+
+```bash
+# 查看所有 CRITICAL 级别的拦截记录
+cat .ai-safety/logs/safety-audit.log | jq 'select(.level == "CRITICAL")'
+
+# 查看最近 24 小时内被拦截的操作
+cat .ai-safety/logs/safety-audit.log | jq 'select(.result == "blocked")' | tail -100
+
+# 统计各风险等级的数量
+cat .ai-safety/logs/safety-audit.log | jq -s 'group_by(.level) | map({level: .[0].level, count: length})'
+
+# 查看特定会话的所有日志
+cat .ai-safety/logs/safety-audit.log | jq 'select(.context.sessionId == "abc123")'
+```
 
 ---
 
